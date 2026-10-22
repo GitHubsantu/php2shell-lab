@@ -1,0 +1,77 @@
+# PHP2Shell lab configuration. Paths match an E:\xampp install.
+
+framework:
+  version: "0.1.0"
+
+targets:
+  default: "http://127.0.0.1:8088"
+  request_timeout: 10.0
+  allow_loopback: true
+  allow_private: false          # widen for an isolated VM on a private range
+  allow_public: false           # --allow-public overrides
+  allowed_hosts: []             # e.g. ["lab.internal"]
+  allowed_cidrs: []             # e.g. ["192.168.56.0/24"]
+  follow_redirects_within_lab: false
+  max_redirect_hops: 3
+
+php:
+  binaries:
+    - name: xampp
+      path: 'E:\xampp\php\php.exe'
+      label: 'XAMPP current PHP'
+    # Add a patched build side by side to compare, without touching XAMPP:
+    # - name: patched
+    #   path: 'E:\php-8.2.35\php.exe'
+    #   label: 'PHP 8.2.35 (fixed)'
+  expected_sapi: apache2handler
+  subprocess_timeout: 20.0
+
+probe:
+  enabled: true
+  filename: php2shell-lab.php
+  token: p2s-local-lab-token    # disposable lab credential
+  webroot: 'E:\xampp\htdocs'
+  url_path: /php2shell-lab.php
+  auto_deploy: true
+  token_header: X-P2S-Token
+
+tests:
+  baseline_paths: ["/", "/index.php"]
+  oom:
+    enabled: true
+    fields: 900
+    nesting: 3
+    block_mib: 1
+    extra_blocks: 6
+    max_blocks: 2048
+    confirm_worker_reuse: true
+    expect_fatal: true
+  leak:
+    enabled: true
+    cookie_name: PHPSESSID
+
+race:
+  concurrency: 12
+  requests_per_worker: 20
+  timeout: 20.0
+
+deep_mode:
+  enabled: true
+  poc_path: null                # e.g. 'E:\tools\php2shell\poc_109618.py'
+  command: id
+  extra_args: []
+
+redaction:
+  headers: [set-cookie, cookie, authorization, x-p2s-token]
+  cookie_names: [PHPSESSID]
+  keep_header_prefix: 16
+
+reporting:
+  dir: reports
+  include_raw_headers: true
+
+logging:
+  dir: logs
+  level: INFO
+  max_bytes: 1048576
+  backup_count: 5

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "php2shell-lab"
+version = "0.1.0"
+description = "Local research framework for CVE-2026-109618 / CVE-2026-109619 (PHP2Shell)"
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.31",
+    "PyYAML>=6.0",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+php2shell = "php2shell.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Keep pytest fixture files inside the project. This avoids failures caused by
+# inaccessible or stale directories in the Windows user temp location.
+addopts = "-q --basetemp=.pytest-tmp"

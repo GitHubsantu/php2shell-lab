@@ -1,0 +1,93 @@
+# Verified 2026-10-22 from php.net and the two php-src GHSA advisories.
+# Anything sourced only from a vendor blog is marked in the summary.
+meta:
+  compiled: "2026-10-22"
+  confidence_note: >
+    Version ranges, fixed releases and mitigations come from the PHP security
+    advisory and GHSA-w8hw-w9fx-j79w / GHSA-6wmf-4rv5-p3rp. SAPI attribution and
+    exploitability claims come from the same advisories. Earliest-affected 5.4.0
+    is from Calif/Sansec/Cloudflare, not confirmed by PHP.
+
+cves:
+  - id: CVE-2026-109618
+    title: "RCE via OOM corruption"
+    ghsa: GHSA-w8hw-w9fx-j79w
+    cvss_v4: 9.2
+    cvss_v3_nvd: 9.8
+    cwe: [416, 755, 824, 1325, 1419]
+    component: "PHP core: longjmp() OOM abort vs request shutdown"
+    summary: >
+      PHP uses longjmp() to exit on out-of-memory. When an allocation fails while
+      request memory is reachable but not fully initialized, the early exit is not
+      accounted for and request shutdown reads invalid state.
+    preconditions:
+      - "mod_php calls request shutdown unconditionally, so the fatal fires before application code"
+      - "A request must reach OOM while staying within its apparent PHP limits"
+      - "FPM exits the child on startup failure, so the startup path does not transfer"
+    sapis_confirmed: ["apache2handler (mod_php)"]
+    sapis_conditional:
+      - "fpm (source analysis only, no complete exploit demonstrated)"
+      - "frankenphp (analogous to mod_php, unvalidated)"
+      - "lsapi (app-specific, unvalidated)"
+    exploitable: "Unauthenticated RCE over HTTP confirmed against mod_php with default input and memory limits."
+    mitigations:
+      - "memory_limit=-1 enforced administratively; not a complete fix"
+      - "post_max_size 8M without uploads, 32M with uploads"
+      - "Bound request size, field count, part count, header count and nesting at the edge"
+      - "Container or cgroup memory.max as an availability boundary"
+      - "Do NOT use RLIMIT_AS or RLIMIT_DATA"
+    references:
+      - "https://github.com/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w"
+      - "https://www.php.net/archive/2026.php#2026-10-21-5"
+      - "https://www.wiz.io/blog/php2shell-php-rce"
+      - "https://calif.io/php2shell/"
+
+  - id: CVE-2026-109619
+    title: "RCE via stale global state"
+    ghsa: GHSA-6wmf-4rv5-p3rp
+    cvss_v4: 9.2
+    cvss_v3_nvd: 9.8
+    cwe: [416, 755, 824, 1325, 1419]
+    component: "PHP core: producer/consumer stale request-owned global state"
+    summary: >
+      Error, session, object and extension state owned by one request can survive
+      the freeing of the request heap. A later request on the same worker consumes
+      it before normal initialization resets it.
+    preconditions:
+      - "Producer: a reachable operation publishes request-owned state globally"
+      - "The matching reset is skipped by a fatal, or repopulated by a late diagnostic"
+      - "Consumer: an operation before normal request init reads or frees the stale state"
+      - "Producer and consumer must land on the same worker"
+    sapis_confirmed:
+      - "apache2handler (mod_php, fatal_error_backtraces path)"
+      - "fpm (session upload-progress lifecycle path)"
+    sapis_conditional:
+      - "INI-diagnostic consumer needs PHP_VALUE / PHP_ADMIN_VALUE before request init"
+      - "lsapi (conditional candidate)"
+    exploitable: "mod_php RCE confirmed via the fatal backtrace path. Session lifecycle RCE validated on mod_php and FPM."
+    mitigations:
+      - "session.upload_progress.enabled=0 plus a worker restart"
+      - "fatal_error_backtraces=0 on PHP 8.5 plus a worker restart"
+      - "Remove invalid or deprecated per-request INI settings"
+      - "pm.max_requests=1 as a research aid, not a fix"
+    references:
+      - "https://github.com/php/php-src/security/advisories/GHSA-6wmf-4rv5-p3rp"
+      - "https://www.php.net/archive/2026.php#2026-10-21-5"
+      - "https://www.wiz.io/blog/php2shell-php-rce"
+
+fixed_releases:
+  "8.2": "8.2.35"
+  "8.3": "8.3.36"
+  "8.4": "8.4.27"
+  "8.5": "8.5.12"
+
+eol_branches: ["5.4", "5.5", "5.6", "7.0", "7.1", "7.2", "7.3", "7.4", "8.0", "8.1"]
+
+earliest_affected: "5.4.0"
+
+# Vendor packages that keep their version string. Not exhaustive.
+backport_packages:
+  - {distro: "Ubuntu 22.04", package: "php8.1", version_prefix: "8.1.2-1ubuntu2.28"}
+  - {distro: "Ubuntu 24.04", package: "php8.3", version_prefix: "8.3.6-0ubuntu0.24.04.13"}
+  - {distro: "Debian 13",    package: "php8.4", version_prefix: "8.4.27-1~deb13u1"}
+  - {distro: "RHEL 9",       package: "php:8.2", version_prefix: "8.2.35"}
